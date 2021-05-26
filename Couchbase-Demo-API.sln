@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Couchbase-API", "Couchbase-API\Couchbase-API.csproj", "{47A5B604-60A8-4F82-8F2B-2AC4EBFDA63F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Couchbase-Lock-Demo", "couchbase-locking-example\Couchbase-Lock-Demo.csproj", "{D8842752-27B8-478A-8F71-DFB0E5AF1864}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{47A5B604-60A8-4F82-8F2B-2AC4EBFDA63F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47A5B604-60A8-4F82-8F2B-2AC4EBFDA63F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{47A5B604-60A8-4F82-8F2B-2AC4EBFDA63F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47A5B604-60A8-4F82-8F2B-2AC4EBFDA63F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D8842752-27B8-478A-8F71-DFB0E5AF1864}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D8842752-27B8-478A-8F71-DFB0E5AF1864}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D8842752-27B8-478A-8F71-DFB0E5AF1864}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D8842752-27B8-478A-8F71-DFB0E5AF1864}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
