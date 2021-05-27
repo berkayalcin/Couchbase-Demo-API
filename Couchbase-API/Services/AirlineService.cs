@@ -17,15 +17,7 @@ namespace Couchbase_API.Services
 
         public List<Airline> GetAllVersions(string id)
         {
-            var allVersions = _travelRepository.GetAllVersions(id);
-            foreach (var (key, airline) in allVersions)
-            {
-                var airlineVersion = key.Replace($"airline_{airline.Id}::v", "");
-                var airlineVersionNumber = string.IsNullOrEmpty(airlineVersion) ? 0 : Convert.ToUInt64(airlineVersion);
-                airline.Version = airlineVersionNumber;
-            }
-
-            var airlines = allVersions.Select(v => v.Value).ToList();
+            var airlines = _travelRepository.GetAll(id);
             return airlines;
         }
 
@@ -43,7 +35,7 @@ namespace Couchbase_API.Services
 
         public Airline InsertNewVersionWithOptimisticLock(string key, Airline airline)
         {
-            var operationResult = _travelRepository.VersionedUpsertWithOptimisticLock(key, airline);
+            var operationResult = _travelRepository.UpsertWithVersionAndUseOptimisticLock(key, airline);
             return operationResult.Content;
         }
 

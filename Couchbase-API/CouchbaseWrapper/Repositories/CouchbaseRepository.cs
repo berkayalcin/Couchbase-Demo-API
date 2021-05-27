@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Couchbase;
+using Couchbase_API.CouchbaseWrapper.Extensions;
 using Couchbase_API.CouchbaseWrapper.Models;
 using Couchbase.Core;
 using Couchbase.Extensions.DependencyInjection;
@@ -17,6 +19,7 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
         private readonly IBucket _bucket;
         private const string VersionSuffix = "_version";
         private const string VersionPrefix = "::v";
+        private const string StartsWithSuffix = "%";
         private readonly string _bucketName;
 
         protected CouchbaseRepository(INamedBucketProvider bucketProvider, ILogger<ICouchbaseRepository<T>> logger)
@@ -38,8 +41,6 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
                 return;
             throw result.Exception;
         }
-
-        #region Get
 
         public IOperationResult<T> GetAndLock(string key, TimeSpan? expiration = null)
         {
@@ -74,58 +75,57 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             return queryResult;
         }
 
+        public List<T> GetAll(string key, long offset = 0, long limit = 10)
+        {
+            key = key.AppendSuffix(StartsWithSuffix);
+            var queryRequest = new QueryRequest()
+                .Statement(
+                    $"SELECT `{_bucketName}`.* FROM `{_bucketName}` WHERE META(`{_bucketName}`).id LIKE $1 OFFSET {offset} LIMIT {limit}")
+                .AddPositionalParameter(key);
+            var queryResult = _bucket.Query<T>(queryRequest);
+            return queryResult.Rows?
+                .Where(r => r.Version > 0)
+                .GroupBy(g => g.Version)
+                .Select(gr => gr.First())
+                .ToList();
+        }
+
+        public List<ObjectDiff> GetDifference(string key, ulong versionNumber)
+        {
+            var currentVersion = _bucket.Get<T>(key);
+            var currentData = currentVersion.Value;
+            var versionToCompare = Get(key, versionNumber);
+            var dataToCompare = versionToCompare.Value;
+
+            var differences = currentData.GetDifference(dataToCompare);
+            return differences.ToList();
+        }
+
         public IQueryResult<T> Query(IQueryRequest queryRequest)
         {
             var queryResult = _bucket.Query<T>(queryRequest);
             return queryResult;
         }
 
-        public ulong GetNumeric(string key)
-        {
-            var document = _bucket.Get<string>(key);
-            return string.IsNullOrEmpty(document.Value) ? 0 : Convert.ToUInt64(document.Value);
-        }
 
-        public Dictionary<string, T> GetAllVersions(string key)
-        {
-            var versions = new Dictionary<string, T>();
-            var latestVersionKey = GetVersionKey(key);
-            var versionsCount = GetNumeric(latestVersionKey);
-            if (versionsCount == 0)
-            {
-                var latestVersion = _bucket.Get<T>(key);
-                versions.Add(GetKeyWithVersionNumber(key, 0), latestVersion.Value);
-                return versions;
-            }
-
-            for (ulong i = 1; i <= versionsCount; i++)
-            {
-                var versionKey = GetKeyWithVersionNumber(key, i);
-                var document = _bucket.Get<T>(versionKey);
-                versions.Add(versionKey, document.Value);
-            }
-
-            var lastVersion = _bucket.Get<T>(key);
-            versions.Add(GetKeyWithVersionNumber(key, versionsCount + 1), lastVersion.Value);
-
-            return versions;
-        }
-
-        #endregion
-
-        #region Upsert
-
-        public IOperationResult<T> Insert(string key, T data)
+        public IDocumentResult<T> Insert(string key, T data)
         {
             var document = BuildDocument(data, key);
             SetAuditProperties(document.Content);
-            return UpsertWithOptimisticLock(key, data);
+            return Upsert(key, data);
+        }
+
+        public IDocumentResult<T> InsertWithVersion(string key, T data)
+        {
+            var document = BuildDocument(data, key);
+            SetAuditProperties(document.Content);
+            return UpsertWithVersion(key, data);
         }
 
         public IOperationResult<T> Update(string key, T data)
         {
             SetAuditProperties(data);
-            return UpsertWithOptimisticLock(key, data);
+            return UpsertAndUseOptimisticLock(key, data);
         }
 
         public IDocumentResult<T> Upsert(string key, T data)
@@ -136,10 +136,11 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             return result;
         }
 
-        public IDocumentResult<T> VersionedUpsert(string key, T data)
+        public IDocumentResult<T> UpsertWithVersion(string key, T data)
         {
-            SetAuditProperties(data);
             var newVersionNumber = GetNewVersionNumber(key);
+            SetAuditProperties(data);
+            SetDocumentVersion(data, newVersionNumber);
             var newKeyWithVersionNumber = GetKeyWithVersionNumber(key, newVersionNumber);
             var latestDocument = BuildDocument(data, key);
             var newDocument = BuildDocument(data, newKeyWithVersionNumber);
@@ -148,16 +149,17 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             return result;
         }
 
-        public IDocumentResult<T> VersionedUpsertWithOptimisticLock(string key, T data)
+        public IDocumentResult<T> UpsertWithVersionAndUseOptimisticLock(string key, T data)
         {
             SetAuditProperties(data);
             var newVersionNumber = GetNewVersionNumber(key);
+            SetDocumentVersion(data, newVersionNumber);
             var newKeyWithVersionNumber = GetKeyWithVersionNumber(key, newVersionNumber);
-            UpsertWithOptimisticLock(key, data);
+            UpsertAndUseOptimisticLock(key, data);
             return Upsert(newKeyWithVersionNumber, data);
         }
 
-        public IOperationResult<T> UpsertWithOptimisticLock(string key, T data, TimeSpan? timeout = null)
+        public IOperationResult<T> UpsertAndUseOptimisticLock(string key, T data, TimeSpan? timeout = null)
         {
             SetAuditProperties(data);
             timeout ??= TimeSpan.FromSeconds(15);
@@ -188,9 +190,6 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             throw new Exception("Operation timed out");
         }
 
-        #endregion
-
-
         private static Document<T> BuildDocument(T data, string key)
         {
             return new()
@@ -201,6 +200,11 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             };
         }
 
+        private static void SetDocumentVersion(T data, ulong version)
+        {
+            data.Version = version;
+        }
+
         private static void SetAuditProperties(T data)
         {
             data.Created ??= DateTime.UtcNow;
@@ -209,7 +213,8 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
 
         private ulong GetNewVersionNumber(string key)
         {
-            var operationResult = _bucket.Increment(GetVersionKey(key), 1, 1);
+            var versionKey = $"{key}{VersionSuffix}";
+            var operationResult = _bucket.Increment(versionKey, 1, 1);
             if (!operationResult.Success)
             {
                 throw operationResult.Exception;
@@ -221,11 +226,6 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
         private static string GetKeyWithVersionNumber(string key, ulong version)
         {
             return $"{key}{VersionPrefix}{version}";
-        }
-
-        private static string GetVersionKey(string key)
-        {
-            return $"{key}{VersionSuffix}";
         }
     }
 }

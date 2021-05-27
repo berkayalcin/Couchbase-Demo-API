@@ -29,7 +29,9 @@ namespace Couchbase_API
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddScoped<ITravelRepository, TravelRepository>();
+            services.AddScoped<ISolutionPartnerRepository, SolutionPartnerRepository>();
             services.AddScoped<IAirlineService, AirlineService>();
+            services.AddScoped<ISolutionPartnerService, SolutionPartnerService>();
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
@@ -55,7 +57,8 @@ namespace Couchbase_API
                     };
                     client.OperationLifespan = 90000;
                 })
-                .AddCouchbaseBucket<ITravelBucketProvider>("travel-sample");
+                .AddCouchbaseBucket<ITravelBucketProvider>("travel-sample")
+                .AddCouchbaseBucket<ISolutionPartnerBucketProvider>("solution-partners");
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }

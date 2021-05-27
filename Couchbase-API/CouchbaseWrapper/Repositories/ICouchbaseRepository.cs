@@ -17,14 +17,15 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
         IOperationResult<T> Get(string key);
         IOperationResult<T> Get(string key, ulong version);
         IQueryResult<T> GetAll(long offset = 0, long limit = 10);
+        List<T> GetAll(string key, long offset = 0, long limit = 10);
         IQueryResult<T> Query(IQueryRequest queryRequest);
-        ulong GetNumeric(string key);
-        Dictionary<string, T> GetAllVersions(string key);
         IDocumentResult<T> Upsert(string key, T data);
-        IDocumentResult<T> VersionedUpsert(string key, T data);
-        IDocumentResult<T> VersionedUpsertWithOptimisticLock(string key, T data);
-        IOperationResult<T> UpsertWithOptimisticLock(string key, T data, TimeSpan? timeout = null);
-        IOperationResult<T> Insert(string key, T data);
+        IDocumentResult<T> UpsertWithVersion(string key, T data);
+        IDocumentResult<T> UpsertWithVersionAndUseOptimisticLock(string key, T data);
+        IOperationResult<T> UpsertAndUseOptimisticLock(string key, T data, TimeSpan? timeout = null);
+        IDocumentResult<T> Insert(string key, T data);
         IOperationResult<T> Update(string key, T data);
+        IDocumentResult<T> InsertWithVersion(string key, T data);
+        List<ObjectDiff> GetDifference(string key, ulong versionNumber);
     }
 }
