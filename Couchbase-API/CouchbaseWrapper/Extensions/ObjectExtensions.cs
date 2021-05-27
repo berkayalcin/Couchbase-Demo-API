@@ -8,6 +8,9 @@ namespace Couchbase_API.CouchbaseWrapper.Extensions
     {
         public static IEnumerable<ObjectDiff> GetDifference<T>(this T left, T right)
         {
+            if (left == null || right == null)
+                return null;
+            var objectDiffs = new List<ObjectDiff>();
             var objectType = typeof(T);
             foreach (var propertyInfo in objectType.GetProperties())
             {
@@ -15,14 +18,16 @@ namespace Couchbase_API.CouchbaseWrapper.Extensions
                 var rightValue = propertyInfo.GetValue(right, null);
                 if (!Equals(leftValue, rightValue))
                 {
-                    yield return new ObjectDiff
+                    objectDiffs.Add(new ObjectDiff
                     {
                         Key = propertyInfo.Name,
                         Left = leftValue,
                         Right = rightValue
-                    };
+                    });
                 }
             }
+
+            return objectDiffs;
         }
     }
 }

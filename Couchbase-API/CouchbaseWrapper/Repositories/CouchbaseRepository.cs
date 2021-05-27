@@ -98,7 +98,7 @@ namespace Couchbase_API.CouchbaseWrapper.Repositories
             var dataToCompare = versionToCompare.Value;
 
             var differences = currentData.GetDifference(dataToCompare);
-            return differences.ToList();
+            return differences?.ToList();
         }
 
         public IQueryResult<T> Query(IQueryRequest queryRequest)
